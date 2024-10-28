@@ -3,7 +3,7 @@ const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config(); // Load environment variables from .env file early
+require('dotenv').config(); // Load environment variables from .env file
 
 const { connectToDatabase, closeDatabaseConnection } = require('./src/config/db');
 const userRoute = require('./src/routes/userRoute');
@@ -24,7 +24,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json()); // Parse incoming request bodies
 app.use(cors({
   origin: function (origin, callback) {
-    const allowedOrigins = ['http://localhost:8100', 'http://example.com'];
+    const allowedOrigins = ['http://localhost:8100', 'http://example.com']; // Adjust as needed
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -44,6 +44,11 @@ app.use(rateLimit({
 
 // Serve static files from 'uploads' directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
 
 // Routes setup
 app.use('/api/users', userRoute);
@@ -73,20 +78,20 @@ const runExpirePaymentsJobOnStart = async (retries = MAX_JOB_RETRIES) => {
   }
 };
 
-// Run the job when the server starts
-// runExpirePaymentsJobOnStart();
-
 // Start the server after connecting to the database
-connectToDatabase()
-  .then(() => {
+const startServer = async () => {
+  try {
+    await connectToDatabase();
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
+      // Uncomment the line below to enable the job after a successful startup
+      // runExpirePaymentsJobOnStart();
     });
-  })
-  .catch(error => {
-    console.error('Error starting server:', error);
+  } catch (error) {
+    console.error('Error starting server due to database connection:', error);
     process.exit(1); // Exit the process with error code 1
-  });
+  }
+};
 
 // Gracefully close the database connection when the process is terminated
 const gracefulShutdown = async () => {
@@ -109,3 +114,6 @@ process.on('unhandledRejection', async (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   await gracefulShutdown();
 });
+
+// Start the server
+startServer();
